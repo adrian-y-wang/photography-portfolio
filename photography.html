@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adrian Wang Photography</title>
+<style>
+  :root { --bg:#0e0d0c; --fg:#ece6dd; --muted:#8f877c; --gap:12px; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--bg); color:var(--fg); font-family:"Helvetica Neue", Arial, sans-serif; }
+
+  header { max-width:1400px; margin:auto; padding:56px 24px 40px; }
+  h1 { font-weight:300; letter-spacing:.08em; font-size:clamp(1.8rem, 4vw, 2.6rem); }
+  .section-title { max-width:1400px; margin:auto; padding:0 24px 20px;
+                   font-weight:400; font-size:.9rem; letter-spacing:.2em; text-transform:uppercase;
+                   color:var(--muted); }
+
+  /* Masonry: JS fills each column, always adding to the shortest one,
+     so photos keep their order left-to-right. */
+  .gallery { display:flex; gap:var(--gap); align-items:flex-start;
+             max-width:1400px; margin:auto; padding:0 24px 64px; }
+  .col { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--gap); }
+  .tile { display:block; padding:0; border:0; background:#1a1816; cursor:zoom-in;
+          overflow:hidden; border-radius:2px; }
+  .tile img { display:block; width:100%; height:auto; opacity:0;
+              transition:opacity .5s, transform .6s; }
+  .tile img.loaded { opacity:1; }
+  .tile:hover img { transform:scale(1.02); }
+  .tile:focus-visible { outline:2px solid var(--fg); outline-offset:3px; }
+
+  /* Lightbox */
+  .lb { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center;
+        background:rgba(8,7,6,.96); }
+  .lb.open { display:flex; }
+  .lb img { max-width:92vw; max-height:88vh; object-fit:contain; }
+  .lb button { position:absolute; background:none; border:0; color:var(--fg); cursor:pointer;
+               font-size:2rem; line-height:1; padding:16px; opacity:.7; }
+  .lb button:hover, .lb button:focus-visible { opacity:1; }
+  .lb .close { top:8px; right:12px; }
+  .lb .prev  { left:8px;  top:50%; transform:translateY(-50%); }
+  .lb .next  { right:8px; top:50%; transform:translateY(-50%); }
+  .lb .count { position:absolute; bottom:16px; color:var(--muted); font-size:.8rem; letter-spacing:.12em; }
+
+  @media (max-width:600px) {
+    header { padding:40px 16px 28px; }
+    .section-title { padding:0 16px 16px; }
+    .gallery { --gap:8px; padding:0 16px 48px; }
+    .lb .prev, .lb .next { display:none; } /* swipe instead */
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Adrian Wang Photography</h1>
+</header>
+
+<main>
+  <section aria-labelledby="japan-2026">
+    <h2 id="japan-2026" class="section-title">Japan 2026</h2>
+    <div id="gallery" class="gallery"></div>
+  </section>
+</main>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <img id="lb-img" alt="">
+  <button class="close" id="lb-close" aria-label="Close">×</button>
+  <button class="prev"  id="lb-prev"  aria-label="Previous photo">‹</button>
+  <button class="next"  id="lb-next"  aria-label="Next photo">›</button>
+  <div class="count" id="lb-count"></div>
+</div>
+
+<script>
+/* ---------- EDIT THIS LIST ----------
+   Put the files in a "photos" folder next to this page.
+   Order here = order on the page. "alt" describes the photo for screen readers. */
+const PHOTOS = [
+  { src: "photos/01.jpg", alt: "Woman with long blonde hair in a red coat embroidered with kanji, standing by a lit doorway on a night street" },
+  { src: "photos/02.jpg", alt: "Boatman coiling rope on a wooden canal boat beneath cherry blossoms, seen from above" },
+  { src: "photos/03.jpg", alt: "Bartender glimpsed through a narrow gap between bottles in a warmly lit bar" },
+  { src: "photos/04.jpg", alt: "Elderly woman with white hair behind a cluttered bar counter, seen through a doorway" },
+  { src: "photos/05.jpg", alt: "Two women talking at a table, seen through a small hazy window" },
+  { src: "photos/06.jpg", alt: "Two people at a bar framed by a window, glowing lights behind them" },
+  { src: "photos/07.jpg", alt: "Man in a cap sipping a drink in a tiny wooden izakaya, seen through a doorway" },
+  { src: "photos/08.jpg", alt: "Man in a State of California jacket outside a restaurant with paper lanterns and price signs" },
+  { src: "photos/09.jpg", alt: "Two diners at a steamy soba counter while cooks work behind it" },
+  { src: "photos/10.jpg", alt: "Row of glowing red-and-white paper lanterns under an orange awning" },
+  { src: "photos/11.jpg", alt: "Two older men talking on a bench as a crowd blurs past" },
+  { src: "photos/12.jpg", alt: "Street musician playing guitar beside a canal lined with neon signs at night" },
+  { src: "photos/13.jpg", alt: "Osaka Castle at sunset, framed by cherry blossoms" },
+  { src: "photos/14.jpg", alt: "Giant lion-head stage at Namba Yasaka Shrine, framed by blossoms" },
+  { src: "photos/15.jpg", alt: "Woman walking beside the open jaws of the lion-head shrine in morning light" },
+  { src: "photos/16.jpg", alt: "Close-up of the lion head's glowing eyes, framed through a gap" },
+  { src: "photos/17.jpg", alt: "Man in a suit carrying a shopping bag past a market stall with noren curtains" },
+  { src: "photos/18.jpg", alt: "Black-and-white portrait of a masked vendor beneath a shop curtain" },
+  { src: "photos/19.jpg", alt: "Sepia portrait of a masked vendor in a white jacket at a market stall" },
+  { src: "photos/20.jpg", alt: "Yellow train passing a level crossing among cherry blossoms" },
+  { src: "photos/21.jpg", alt: "Sepia photo of a boatman tending the outboard motor of a wooden canal boat" },
+  { src: "photos/22.jpg", alt: "Moored canal boats with paper lanterns under cherry blossoms, reflected in the water" },
+  { src: "photos/23.jpg", alt: "Silhouette of a man passing the glowing window of a busy noodle restaurant at night" },
+  { src: "photos/24.jpg", alt: "Man in a suit walking past a yakitori shop lit by red lanterns and cherry blossoms" },
+  { src: "photos/25.jpg", alt: "Businessman on a phone crossing a striped crosswalk among umbrellas, seen from above" },
+  { src: "photos/26.jpg", alt: "Sepia photo of two older men photographing the city at night from a riverside wall" },
+  { src: "photos/27.jpg", alt: "Sepia photo of a street musician in a wide straw hat playing shamisen at night" },
+  { src: "photos/28.jpg", alt: "Two figures at opposite ends of a lit window in a traditional wooden building at night" },
+  { src: "photos/29.jpg", alt: "Kyoto fire engine speeding past at night, panned with motion blur" },
+  { src: "photos/30.jpg", alt: "Cyclist riding down a path under cherry blossoms toward distant walkers" },
+  { src: "photos/31.jpg", alt: "Elderly man in a kimono and mask waiting on a sunlit train platform" },
+  { src: "photos/32.jpg", alt: "Elderly man in a kimono leaning on a cane on a train platform in golden light" },
+];
+/* ------------------------------------ */
+
+const gallery = document.getElementById("gallery");
+const lb = document.getElementById("lb");
+const lbImg = document.getElementById("lb-img");
+const lbCount = document.getElementById("lb-count");
+let tiles = [], dims = [], current = 0, lastCols = 0, opener = null;
+
+const columnsFor = w => (w < 520 ? 1 : w < 1000 ? 2 : 3);
+
+// Read each photo's size so the columns can be balanced (works for any mix of shapes).
+function getSize(src) {
+  return new Promise(resolve => {
+    const im = new Image();
+    im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+    im.onerror = () => resolve(null); // missing file: skipped
+    im.src = src;
+  });
+}
+
+function makeTile(p, i, d) {
+  const btn = document.createElement("button");
+  btn.className = "tile";
+  btn.setAttribute("aria-label", "Open photo " + (i + 1));
+  const img = document.createElement("img");
+  img.alt = p.alt || "";
+  img.width = d.w; img.height = d.h; // reserves space, no layout jumps
+  img.decoding = "async";
+  img.onload = () => img.classList.add("loaded");
+  img.src = p.src;
+  if (img.complete) img.classList.add("loaded");
+  btn.appendChild(img);
+  btn.addEventListener("click", () => openLb(i, btn));
+  return btn;
+}
+
+function layout() {
+  const n = columnsFor(window.innerWidth);
+  if (n === lastCols) return;
+  lastCols = n;
+  const cols = Array.from({ length: n }, () => {
+    const c = document.createElement("div"); c.className = "col"; return c;
+  });
+  const heights = new Array(n).fill(0);
+  tiles.forEach((t, i) => {
+    if (!t) return;
+    const k = heights.indexOf(Math.min(...heights));
+    cols[k].appendChild(t);
+    heights[k] += dims[i].h / dims[i].w;
+  });
+  gallery.replaceChildren(...cols);
+}
+
+/* Lightbox */
+const visible = () => tiles.map((t, i) => (t ? i : -1)).filter(i => i >= 0);
+
+function show(i) {
+  current = i;
+  const list = visible();
+  lbImg.src = PHOTOS[i].src;
+  lbImg.alt = PHOTOS[i].alt || "";
+  lbCount.textContent = (list.indexOf(i) + 1) + " / " + list.length;
+  // preload neighbours
+  [step(1), step(-1)].forEach(j => { new Image().src = PHOTOS[j].src; });
+}
+function step(dir) {
+  const list = visible();
+  return list[(list.indexOf(current) + dir + list.length) % list.length];
+}
+function openLb(i, from) {
+  opener = from;
+  show(i);
+  lb.classList.add("open");
+  document.body.style.overflow = "hidden";
+  document.getElementById("lb-close").focus();
+}
+function closeLb() {
+  lb.classList.remove("open");
+  document.body.style.overflow = "";
+  if (opener) opener.focus();
+}
+
+document.getElementById("lb-close").onclick = closeLb;
+document.getElementById("lb-prev").onclick = () => show(step(-1));
+document.getElementById("lb-next").onclick = () => show(step(1));
+lb.addEventListener("click", e => { if (e.target === lb) closeLb(); });
+document.addEventListener("keydown", e => {
+  if (!lb.classList.contains("open")) return;
+  if (e.key === "Escape") closeLb();
+  if (e.key === "ArrowRight") show(step(1));
+  if (e.key === "ArrowLeft") show(step(-1));
+});
+let touchX = null;
+lb.addEventListener("touchstart", e => { touchX = e.touches[0].clientX; }, { passive: true });
+lb.addEventListener("touchend", e => {
+  if (touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 50) show(step(dx < 0 ? 1 : -1));
+  touchX = null;
+});
+
+/* Start */
+Promise.all(PHOTOS.map(p => getSize(p.src))).then(sizes => {
+  dims = sizes;
+  tiles = PHOTOS.map((p, i) => (sizes[i] ? makeTile(p, i, sizes[i]) : null));
+  layout();
+  let t;
+  window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(layout, 150); });
+});
+</script>
+</body>
+</html>
